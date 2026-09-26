@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="vi">
+  <head>
+    <meta charset="utf-8" />
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self'"
+    />
+    <title>detoilo Zalo</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <main>
+      <p class="eyebrow">Cầu nối Zalo cá nhân</p>
+      <h1>detoilo Zalo</h1>
+      <p class="lede">
+        Cài trên máy tính tiệm, ghép với workspace, rồi quét QR trên điện thoại.
+        Giữ app chạy — tắt máy là mất inbox.
+      </p>
+      <p id="badge" class="badge off">Chưa kết nối</p>
+      <p id="message" class="message"></p>
+
+      <label>
+        Địa chỉ API detoilo
+        <input id="apiBaseUrl" type="url" spellcheck="false" placeholder="https://…" />
+      </label>
+      <label>
+        Mã ghép máy (6 số)
+        <input id="pairingCode" inputmode="numeric" maxlength="8" placeholder="482 193" />
+      </label>
+
+      <div class="actions">
+        <button id="pairBtn" type="button">Ghép máy</button>
+        <button id="unpairBtn" class="ghost" type="button">Hủy ghép</button>
+      </div>
+      <p class="fine">
+        Thử nghiệm — không phải API chính thức của Zalo. Xem
+        <span>zalo.vn/dieukhoan</span>.
+      </p>
+    </main>
+    <script src="./app.js"></script>
+  </body>
+</html>
