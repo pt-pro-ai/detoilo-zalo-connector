@@ -102,7 +102,7 @@ function connectSocket() {
   const code = String(cfg.pairingCode || "").replace(/\s+/g, "");
   const token = String(cfg.deviceToken || "").trim();
   if (!cfg.apiBaseUrl || (!code && !token)) {
-    pushStatus({ online: false, message: "Nhập địa chỉ API và mã ghép máy." });
+    pushStatus({ online: false, message: "Nhập địa chỉ máy chủ và mã kết nối." });
     return;
   }
 
@@ -154,7 +154,7 @@ function connectSocket() {
       pushStatus({
         online: true,
         paired: true,
-        message: "Máy đã ghép. Giữ app chạy khi tiệm mở cửa.",
+        message: "Kết nối thành công. Để app mở trong giờ tiệm hoạt động.",
       });
       return;
     }
@@ -179,12 +179,12 @@ function connectSocket() {
   next.on("close", () => {
     if (socket === next) socket = null;
     clearTimers();
-    pushStatus({ online: false, message: "Mất kết nối. Đang thử lại…" });
+    pushStatus({ online: false, message: "Mất kết nối, đang tự kết nối lại…" });
     scheduleReconnect();
   });
 
   next.on("error", (err) => {
-    pushStatus({ online: false, message: err?.message || "Lỗi kết nối" });
+    pushStatus({ online: false, message: err?.message || "Không kết nối được máy chủ" });
   });
 }
 
@@ -259,7 +259,7 @@ ipcMain.handle("pair", (_event, payload) => {
   const apiBaseUrl = String(payload?.apiBaseUrl || "").trim();
   const pairingCode = String(payload?.pairingCode || "").replace(/\s+/g, "");
   if (!apiBaseUrl || !pairingCode) {
-    return { ok: false, error: "Cần địa chỉ API và mã ghép máy." };
+    return { ok: false, error: "Vui lòng nhập địa chỉ máy chủ và mã kết nối." };
   }
   saveConfig({ apiBaseUrl, pairingCode, deviceToken: "", businessId: "" });
   connectSocket();
@@ -275,7 +275,7 @@ ipcMain.handle("unpair", () => {
       /* ignore */
     }
   }
-  pushStatus({ paired: false, online: false, message: "Đã hủy ghép máy." });
+  pushStatus({ paired: false, online: false, message: "Đã ngắt kết nối." });
   return { ok: true };
 });
 

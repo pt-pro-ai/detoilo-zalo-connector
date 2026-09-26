@@ -99,10 +99,10 @@ export async function startQrLogin(sessionId, businessId) {
         session.display_name = event.data?.display_name || null;
       } else if (event.type === LoginQRCallbackEventType.QRCodeExpired) {
         session.status = "expired";
-        session.error = "QR hết hạn";
+        session.error = "Mã QR đã hết hạn";
       } else if (event.type === LoginQRCallbackEventType.QRCodeDeclined) {
         session.status = "error";
-        session.error = "Người dùng từ chối đăng nhập QR";
+        session.error = "Bạn đã từ chối đăng nhập trên điện thoại";
       }
     })
     .then(async (api) => {

@@ -14,10 +14,10 @@ function render(status) {
     codeInput.value = status.pairingCode;
   }
   const online = Boolean(status.online);
-  badge.textContent = online ? "Đã kết nối API" : "Chưa kết nối";
+  badge.textContent = online ? "Đã kết nối" : "Chưa kết nối";
   badge.classList.toggle("on", online);
   badge.classList.toggle("off", !online);
-  message.textContent = status.message || (status.paired ? "Đã ghép máy." : "");
+  message.textContent = status.message || (status.paired ? "Đã kết nối với detoilo." : "");
 }
 
 async function refresh() {
@@ -33,7 +33,7 @@ pairBtn.addEventListener("click", async () => {
       pairingCode: codeInput.value,
     });
     if (!result?.ok) {
-      message.textContent = result?.error || "Không ghép được máy.";
+      message.textContent = result?.error || "Không kết nối được. Kiểm tra lại mã rồi thử lại.";
     }
   } finally {
     pairBtn.disabled = false;
