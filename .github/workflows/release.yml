@@ -1,0 +1,96 @@
+name: Release
+
+# Electron installers are 100–300MB. Git rejects files over 100MB, so we never
+# commit them. GitHub Releases accept assets up to 2GB; `gh release upload`
+# streams each file through that API instead of attaching via a git commit.
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            script: dist:win
+          - os: macos-latest
+            script: dist:mac
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - run: npm run ${{ matrix.script }}
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: "false"
+      - name: Stage installer assets
+        shell: bash
+        run: |
+          mkdir -p release-assets
+          shopt -s nullglob
+          for f in dist-desktop/detoilo-zalo-*.exe dist-desktop/detoilo-zalo-*.zip dist-desktop/detoilo-zalo-*.dmg; do
+            cp "$f" release-assets/
+            ls -lh "$f"
+          done
+          test -n "$(ls -A release-assets)"
+      - name: Upload large build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: installers-${{ matrix.os }}
+          path: release-assets/*
+          if-no-files-found: error
+          compression-level: 0
+          retention-days: 5
+
+  publish:
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Download installer artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: release-assets
+          merge-multiple: true
+      - name: Publish large files to GitHub Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          tag="${GITHUB_REF_NAME}"
+          if [[ "${GITHUB_REF_TYPE:-}" != "tag" ]]; then
+            echo "Publish only runs on version tags (got ${GITHUB_REF_TYPE:-unknown} ${tag})." >&2
+            exit 1
+          fi
+          mapfile -t files < <(find release-assets -type f \( -name 'detoilo-zalo-*.exe' -o -name 'detoilo-zalo-*.zip' -o -name 'detoilo-zalo-*.dmg' \) | sort)
+          if [[ ${#files[@]} -eq 0 ]]; then
+            echo "no installer assets to upload" >&2
+            exit 1
+          fi
+          echo "Uploading ${#files[@]} large assets to release ${tag}:"
+          ls -lh "${files[@]}"
+          if ! gh release view "$tag" --repo "${GITHUB_REPOSITORY}" >/dev/null 2>&1; then
+            gh release create "$tag" \
+              --repo "${GITHUB_REPOSITORY}" \
+              --title "detoilo Zalo ${tag}" \
+              --generate-notes \
+              --verify-tag
+          fi
+          # One file at a time so a 300MB dmg uses the Releases large-file
+          # upload API without racing the other matrix artifacts.
+          for f in "${files[@]}"; do
+            echo "uploading $(basename "$f") ($(du -h "$f" | cut -f1))"
+            gh release upload "$tag" "$f" --repo "${GITHUB_REPOSITORY}" --clobber
+          done

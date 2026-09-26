@@ -1,0 +1,9 @@
+node_modules/
+# Packaged installers (100MB+). Upload via GitHub Releases, never git.
+dist-desktop/
+out/
+*.log
+.DS_Store
+.idea/
+.vscode/
+*.iml

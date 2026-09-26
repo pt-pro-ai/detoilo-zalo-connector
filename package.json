@@ -1,0 +1,84 @@
+{
+  "name": "detoilo-zalo-connector",
+  "private": true,
+  "version": "0.1.0",
+  "author": "detoilo",
+  "description": "Shop-PC desktop connector for unofficial personal Zalo (zca-js). Released independently of detoilo-be.",
+  "type": "module",
+  "main": "desktop/main.mjs",
+  "scripts": {
+    "start": "node server.mjs",
+    "dev": "node --watch server.mjs",
+    "desktop": "electron .",
+    "test": "node --test tests/*.test.mjs",
+    "dist": "electron-builder --win --mac",
+    "dist:win": "electron-builder --win",
+    "dist:mac": "electron-builder --mac"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/pt-pro-ai/detoilo-zalo-connector.git"
+  },
+  "dependencies": {
+    "ws": "^8.18.3",
+    "zca-js": "^2.1.2"
+  },
+  "devDependencies": {
+    "electron": "^37.2.6",
+    "electron-builder": "^26.0.12"
+  },
+  "build": {
+    "appId": "com.detoilo.zalo",
+    "productName": "detoilo Zalo",
+    "copyright": "detoilo",
+    "artifactName": "detoilo-zalo-${os}-${arch}.${ext}",
+    "directories": {
+      "output": "dist-desktop"
+    },
+    "files": [
+      "core.mjs",
+      "desktop/**/*",
+      "package.json"
+    ],
+    "asar": true,
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": ["x64"]
+        },
+        {
+          "target": "zip",
+          "arch": ["x64"]
+        }
+      ]
+    },
+    "mac": {
+      "target": [
+        {
+          "target": "dmg",
+          "arch": ["x64", "arm64"]
+        },
+        {
+          "target": "zip",
+          "arch": ["x64", "arm64"]
+        }
+      ],
+      "category": "public.app-category.business",
+      "identity": null
+    },
+    "nsis": {
+      "oneClick": true,
+      "perMachine": false
+    },
+    "publish": {
+      "provider": "github",
+      "owner": "pt-pro-ai",
+      "repo": "detoilo-zalo-connector",
+      "releaseType": "release"
+    }
+  }
+}
