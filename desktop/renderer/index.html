@@ -11,27 +11,23 @@
   </head>
   <body>
     <main>
-      <p class="eyebrow">Cầu nối Zalo cá nhân</p>
+      <p class="eyebrow">Kết nối Zalo cá nhân</p>
       <h1>detoilo Zalo</h1>
       <p class="lede">
-        Cài trên máy tính tiệm, ghép với workspace, rồi quét QR trên điện thoại.
-        Giữ app chạy — tắt máy là mất inbox.
+        Cài app trên máy tính ở tiệm, nhập mã kết nối từ detoilo, rồi quét QR bằng điện thoại.
+        Để app luôn mở — tắt máy thì trợ lý sẽ không nhận được tin nhắn Zalo.
       </p>
       <p id="badge" class="badge off">Chưa kết nối</p>
       <p id="message" class="message"></p>
 
       <label>
-        Địa chỉ API detoilo
-        <input id="apiBaseUrl" type="url" spellcheck="false" placeholder="https://…" />
-      </label>
-      <label>
-        Mã ghép máy (6 số)
+        Mã kết nối (6 số)
         <input id="pairingCode" inputmode="numeric" maxlength="8" placeholder="482 193" />
       </label>
 
       <div class="actions">
-        <button id="pairBtn" type="button">Ghép máy</button>
-        <button id="unpairBtn" class="ghost" type="button">Hủy ghép</button>
+        <button id="pairBtn" type="button">Kết nối</button>
+        <button id="unpairBtn" class="ghost" type="button">Ngắt kết nối</button>
       </div>
       <p class="fine">
         Thử nghiệm — không phải API chính thức của Zalo. Xem
