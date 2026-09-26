@@ -30,6 +30,7 @@ without touching the API.
 
 ```bash
 npm install
+# The desktop app dials https://api.detoilo.com by default; point it at a local API instead:
 export DETOILO_PUBLIC_BASE_URL=http://127.0.0.1:8000
 npm test
 npm run desktop

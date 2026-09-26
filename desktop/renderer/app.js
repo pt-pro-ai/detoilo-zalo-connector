@@ -1,4 +1,3 @@
-const apiInput = document.getElementById("apiBaseUrl");
 const codeInput = document.getElementById("pairingCode");
 const badge = document.getElementById("badge");
 const message = document.getElementById("message");
@@ -7,9 +6,6 @@ const unpairBtn = document.getElementById("unpairBtn");
 
 function render(status) {
   if (!status) return;
-  if (typeof status.apiBaseUrl === "string" && document.activeElement !== apiInput) {
-    apiInput.value = status.apiBaseUrl;
-  }
   if (typeof status.pairingCode === "string" && document.activeElement !== codeInput) {
     codeInput.value = status.pairingCode;
   }
@@ -29,7 +25,6 @@ pairBtn.addEventListener("click", async () => {
   pairBtn.disabled = true;
   try {
     const result = await window.detoiloDesktop.pair({
-      apiBaseUrl: apiInput.value,
       pairingCode: codeInput.value,
     });
     if (!result?.ok) {

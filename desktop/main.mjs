@@ -13,6 +13,7 @@ import { handleRpc } from "../core.mjs";
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 const CONFIG_NAME = "desktop-config.json";
+const API_BASE_URL = process.env.DETOILO_PUBLIC_BASE_URL || "https://api.detoilo.com";
 
 /** @type {BrowserWindow | null} */
 let mainWindow = null;
@@ -37,7 +38,6 @@ function loadConfig() {
     /* first run */
   }
   return {
-    apiBaseUrl: process.env.DETOILO_PUBLIC_BASE_URL || "http://127.0.0.1:8000",
     pairingCode: "",
     deviceToken: "",
     deviceName: "",
@@ -52,8 +52,8 @@ function saveConfig(next) {
   return current;
 }
 
-function wsUrl(apiBaseUrl, { code, token }) {
-  const base = String(apiBaseUrl || "").trim().replace(/\/$/, "");
+function wsUrl({ code, token }) {
+  const base = String(API_BASE_URL).trim().replace(/\/$/, "");
   const wsBase = base.replace(/^http/i, "ws");
   const url = new URL(`${wsBase}/api/v1/bridges/zalo_personal/ws`);
   if (token) url.searchParams.set("token", token);
@@ -64,7 +64,6 @@ function wsUrl(apiBaseUrl, { code, token }) {
 function pushStatus(partial) {
   const cfg = loadConfig();
   const payload = {
-    apiBaseUrl: cfg.apiBaseUrl,
     pairingCode: cfg.pairingCode,
     paired: Boolean(cfg.deviceToken),
     businessId: cfg.businessId || "",
@@ -101,8 +100,8 @@ function connectSocket() {
   const cfg = loadConfig();
   const code = String(cfg.pairingCode || "").replace(/\s+/g, "");
   const token = String(cfg.deviceToken || "").trim();
-  if (!cfg.apiBaseUrl || (!code && !token)) {
-    pushStatus({ online: false, message: "Nhập địa chỉ máy chủ và mã kết nối." });
+  if (!code && !token) {
+    pushStatus({ online: false, message: "Nhập mã kết nối." });
     return;
   }
 
@@ -117,7 +116,7 @@ function connectSocket() {
   }
   clearTimers();
 
-  const url = wsUrl(cfg.apiBaseUrl, { code, token });
+  const url = wsUrl({ code, token });
   pushStatus({ online: false, message: "Đang kết nối máy chủ…" });
   const next = new WebSocket(url);
 
@@ -247,7 +246,6 @@ function createTray() {
 ipcMain.handle("get-status", () => {
   const cfg = loadConfig();
   return {
-    apiBaseUrl: cfg.apiBaseUrl,
     pairingCode: cfg.pairingCode,
     paired: Boolean(cfg.deviceToken),
     businessId: cfg.businessId || "",
@@ -256,12 +254,11 @@ ipcMain.handle("get-status", () => {
 });
 
 ipcMain.handle("pair", (_event, payload) => {
-  const apiBaseUrl = String(payload?.apiBaseUrl || "").trim();
   const pairingCode = String(payload?.pairingCode || "").replace(/\s+/g, "");
-  if (!apiBaseUrl || !pairingCode) {
-    return { ok: false, error: "Vui lòng nhập địa chỉ máy chủ và mã kết nối." };
+  if (!pairingCode) {
+    return { ok: false, error: "Vui lòng nhập mã kết nối." };
   }
-  saveConfig({ apiBaseUrl, pairingCode, deviceToken: "", businessId: "" });
+  saveConfig({ pairingCode, deviceToken: "", businessId: "" });
   connectSocket();
   return { ok: true };
 });
