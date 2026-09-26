@@ -119,6 +119,7 @@ function connectSocket() {
   const url = wsUrl({ code, token });
   pushStatus({ online: false, message: "Đang kết nối máy chủ…" });
   const next = new WebSocket(url);
+  let rejectedMessage = "";
 
   next.on("open", () => {
     socket = next;
@@ -157,6 +158,16 @@ function connectSocket() {
       });
       return;
     }
+    if (msg?.type === "error") {
+      if (token) {
+        saveConfig({ deviceToken: "", businessId: "" });
+        rejectedMessage = "Kết nối với detoilo đã hết hiệu lực. Lấy mã kết nối mới trên web rồi nhập lại.";
+      } else {
+        saveConfig({ pairingCode: "" });
+        rejectedMessage = "Mã kết nối không đúng hoặc đã hết hạn. Lấy mã mới trên web rồi thử lại.";
+      }
+      return;
+    }
     if (msg?.type === "rpc") {
       try {
         const data = await handleRpc(String(msg.method || ""), msg.payload || {});
@@ -178,6 +189,10 @@ function connectSocket() {
   next.on("close", () => {
     if (socket === next) socket = null;
     clearTimers();
+    if (rejectedMessage) {
+      pushStatus({ online: false, paired: false, message: rejectedMessage });
+      return;
+    }
     pushStatus({ online: false, message: "Mất kết nối, đang tự kết nối lại…" });
     scheduleReconnect();
   });
