@@ -1,6 +1,12 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { handleRpc, healthSnapshot, signBody } from "../core.mjs";
+import {
+  downloadPublicImage,
+  handleRpc,
+  healthSnapshot,
+  normalizeInboundContent,
+  signBody,
+} from "../core.mjs";
 
 test("health RPC reports no attached accounts", async () => {
   const data = await handleRpc("health", {});
@@ -83,4 +89,35 @@ test("signBody is stable HMAC hex", () => {
   assert.equal(first, second);
   assert.equal(first.length, 64);
   assert.notEqual(signBody("other", body), first);
+});
+
+test("text messages stay text", async () => {
+  const parsed = await normalizeInboundContent("  chào shop  ");
+  assert.deepEqual(parsed, { text: "chào shop", images: [] });
+});
+
+test("photo messages download on the shop PC and forward bytes", async () => {
+  const parsed = await normalizeInboundContent(
+    { href: "https://f25-zpc.zdn.vn/jpg/photo.jpg", title: "" },
+    {
+      msgType: "chat.photo",
+      download: async () => ({ contentType: "image/jpeg", base64: "aGVsbG8=" }),
+    },
+  );
+  assert.equal(parsed.text, "[ảnh]");
+  assert.equal(parsed.images[0].content_type, "image/jpeg");
+  assert.equal(parsed.images[0].data_base64, "aGVsbG8=");
+});
+
+test("downloadPublicImage refuses private hosts", async () => {
+  assert.equal(await downloadPublicImage("http://127.0.0.1/a.jpg"), null);
+  assert.equal(await downloadPublicImage("https://192.168.1.5/a.jpg"), null);
+  let called = false;
+  const result = await downloadPublicImage("https://cdn.example/a.jpg", async () => {
+    called = true;
+    return { ok: true, status: 200, headers: { get: () => "image/jpeg" }, arrayBuffer: async () => new Uint8Array([1]).buffer };
+  });
+  assert.equal(called, true);
+  assert.equal(result.contentType, "image/jpeg");
+  assert.equal(result.base64, Buffer.from([1]).toString("base64"));
 });
