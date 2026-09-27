@@ -15,6 +15,95 @@ export function signBody(secret, bodyBuf) {
   return crypto.createHmac("sha256", secret).update(bodyBuf).digest("hex");
 }
 
+const MAX_IMAGE_BYTES = 8 * 1024 * 1024;
+
+function isPublicHttps(raw) {
+  let url;
+  try {
+    url = new URL(String(raw || ""));
+  } catch {
+    return false;
+  }
+  if (url.protocol !== "https:") return false;
+  const host = url.hostname.toLowerCase();
+  if (
+    host === "localhost" ||
+    host.endsWith(".local") ||
+    host === "127.0.0.1" ||
+    host === "::1" ||
+    host === "0.0.0.0"
+  ) {
+    return false;
+  }
+  if (/^(10\.|192\.168\.|172\.(1[6-9]|2\d|3[0-1])\.|169\.254\.)/.test(host)) {
+    return false;
+  }
+  return true;
+}
+
+/** Download a Zalo CDN photo on the shop PC, where the session can reach it. */
+export async function downloadPublicImage(url, fetchImpl = fetch) {
+  let current = String(url || "").trim();
+  for (let hop = 0; hop < 3; hop += 1) {
+    if (!isPublicHttps(current)) return null;
+    const resp = await fetchImpl(current, { redirect: "manual" });
+    if (resp.status >= 300 && resp.status < 400) {
+      const next = resp.headers.get("location");
+      if (!next) return null;
+      current = new URL(next, current).toString();
+      continue;
+    }
+    if (!resp.ok) return null;
+    const contentType = (resp.headers.get("content-type") || "image/jpeg")
+      .split(";")[0]
+      .trim()
+      .toLowerCase();
+    if (contentType && !contentType.startsWith("image/")) return null;
+    const buf = Buffer.from(await resp.arrayBuffer());
+    if (!buf.length || buf.length > MAX_IMAGE_BYTES) return null;
+    return {
+      contentType: contentType || "image/jpeg",
+      base64: buf.toString("base64"),
+    };
+  }
+  return null;
+}
+
+/**
+ * Turn a zca-js message body into the webhook payload the API stores.
+ * `download` is injected so tests do not touch the network.
+ */
+export async function normalizeInboundContent(content, { msgType, download } = {}) {
+  if (typeof content === "string") {
+    const text = content.trim();
+    return text ? { text, images: [] } : null;
+  }
+  if (!content || typeof content !== "object") return null;
+  const type = String(msgType || "").toLowerCase();
+  const href = String(content.href || "").trim();
+  if (href && (type === "chat.photo" || type.includes("photo"))) {
+    const downloaded = download ? await download(href) : null;
+    if (downloaded?.base64) {
+      const caption = String(content.title || content.description || "").trim();
+      return {
+        text: caption || "[ảnh]",
+        images: [
+          {
+            content_type: downloaded.contentType || "image/jpeg",
+            data_base64: downloaded.base64,
+          },
+        ],
+      };
+    }
+    return { text: "[ảnh]", images: [] };
+  }
+  if (type.includes("sticker")) return { text: "[nhãn dán]", images: [] };
+  if (type.includes("video")) return { text: "[video]", images: [] };
+  if (type.includes("voice") || type.includes("audio")) return { text: "[âm thanh]", images: [] };
+  if (type.includes("file") || type.includes("doc")) return { text: "[tệp]", images: [] };
+  return null;
+}
+
 export async function postWebhook(webhookUrl, webhookSecret, payload) {
   const body = Buffer.from(JSON.stringify(payload), "utf8");
   const signature = signBody(webhookSecret, body);
@@ -199,8 +288,11 @@ export async function attachAccount({
     try {
       if (message.isSelf) return;
       if (message.type !== ThreadType.User) return;
-      const content = message.data?.content;
-      if (typeof content !== "string" || !content.trim()) return;
+      const normalized = await normalizeInboundContent(message.data?.content, {
+        msgType: message.data?.msgType,
+        download: downloadPublicImage,
+      });
+      if (!normalized) return;
 
       const fromUserId = String(message.data?.uidFrom || message.threadId || "");
       if (!fromUserId) return;
@@ -217,7 +309,8 @@ export async function attachAccount({
         external_account_id: entry.externalAccountId,
         message: {
           msg_id: msgId,
-          text: content,
+          text: normalized.text,
+          images: normalized.images,
           from_user_id: fromUserId,
           from_display_name: fromDisplayName,
           is_self: false,
