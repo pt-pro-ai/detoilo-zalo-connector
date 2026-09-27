@@ -31,7 +31,10 @@ jobs:
           node-version: 20
           cache: npm
       - run: npm ci
-      - run: npm run ${{ matrix.script }}
+      # A version tag makes electron-builder publish on its own. That needs
+      # GH_TOKEN during the build and fails before the installers are staged.
+      # The publish job uploads the large assets with gh release upload.
+      - run: npm run ${{ matrix.script }} -- --publish never
         env:
           CSC_IDENTITY_AUTO_DISCOVERY: "false"
       - name: Stage installer assets

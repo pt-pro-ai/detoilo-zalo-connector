@@ -1,7 +1,7 @@
 {
   "name": "detoilo-zalo-connector",
   "private": true,
-  "version": "0.1.0",
+  "version": "0.1.2",
   "author": "detoilo",
   "description": "Shop-PC desktop connector for unofficial personal Zalo (zca-js). Released independently of detoilo-be.",
   "type": "module",
