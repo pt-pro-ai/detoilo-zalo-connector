@@ -4,6 +4,9 @@
  */
 
 import crypto from "node:crypto";
+import fs from "node:fs";
+import os from "node:os";
+import path from "node:path";
 import { LoginQRCallbackEventType, ThreadType, Zalo } from "zca-js";
 
 /** @type {Map<string, any>} */
@@ -346,21 +349,66 @@ export async function detachAccount(accountId) {
   return { ok: true };
 }
 
-export async function sendMessage(accountId, userId, text) {
+function imageExtension(contentType) {
+  if (contentType.includes("png")) return ".png";
+  if (contentType.includes("webp")) return ".webp";
+  if (contentType.includes("gif")) return ".gif";
+  return ".jpg";
+}
+
+/** Download catalog photo URLs into temp files zca-js can attach. */
+export async function catalogAttachmentPaths(urls, download = downloadPublicImage) {
+  const files = [];
+  for (const url of urls || []) {
+    const downloaded = await download(url);
+    if (!downloaded?.base64) continue;
+    const file = path.join(
+      os.tmpdir(),
+      `detoilo-${crypto.randomBytes(8).toString("hex")}${imageExtension(downloaded.contentType || "")}`,
+    );
+    fs.writeFileSync(file, Buffer.from(downloaded.base64, "base64"));
+    files.push(file);
+  }
+  return files;
+}
+
+export function removeTempFiles(files) {
+  for (const file of files || []) {
+    try {
+      fs.unlinkSync(file);
+    } catch {
+      // The send already finished; a leftover temp file is harmless.
+    }
+  }
+}
+
+export async function sendMessage(accountId, userId, text, imageUrls = []) {
   const entry = accounts.get(accountId);
   if (!entry) {
     const err = new Error("account not attached");
     err.status = 404;
     throw err;
   }
-  const result = await entry.api.sendMessage(
-    { msg: text },
-    String(userId),
-    ThreadType.User,
-  );
-  const messageId =
-    result?.message?.msgId || result?.msgId || result?.messageId || null;
-  return { ok: true, message_id: messageId ? String(messageId) : null };
+  const attachments = await catalogAttachmentPaths(imageUrls);
+  const payload = { msg: text || "" };
+  if (attachments.length) payload.attachments = attachments;
+  if (!payload.msg && !attachments.length) {
+    const err = new Error("text or image_urls required");
+    err.status = 400;
+    throw err;
+  }
+  try {
+    const result = await entry.api.sendMessage(
+      payload,
+      String(userId),
+      ThreadType.User,
+    );
+    const messageId =
+      result?.message?.msgId || result?.msgId || result?.messageId || null;
+    return { ok: true, message_id: messageId ? String(messageId) : null };
+  } finally {
+    removeTempFiles(attachments);
+  }
 }
 
 export function qrPublicView(session) {
@@ -426,12 +474,15 @@ export async function handleRpc(method, payload = {}) {
       const accountId = String(payload.account_id || "").trim();
       const userId = String(payload.user_id || "").trim();
       const text = String(payload.text || "");
-      if (!userId || !text) {
-        const err = new Error("user_id and text required");
+      const imageUrls = Array.isArray(payload.image_urls)
+        ? payload.image_urls.map((url) => String(url || "").trim()).filter(Boolean)
+        : [];
+      if (!userId || (!text && imageUrls.length === 0)) {
+        const err = new Error("user_id and text or image_urls required");
         err.status = 400;
         throw err;
       }
-      return sendMessage(accountId, userId, text);
+      return sendMessage(accountId, userId, text, imageUrls);
     }
     case "account.detach": {
       const accountId = String(payload.account_id || "").trim();

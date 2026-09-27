@@ -126,10 +126,13 @@ const server = http.createServer(async (req, res) => {
       const body = raw.length ? JSON.parse(raw.toString("utf8")) : {};
       const userId = String(body.user_id || "").trim();
       const text = String(body.text || "");
-      if (!userId || !text) {
-        return json(res, 400, { error: "user_id and text required" });
+      const imageUrls = Array.isArray(body.image_urls)
+        ? body.image_urls.map((url) => String(url || "").trim()).filter(Boolean)
+        : [];
+      if (!userId || (!text && imageUrls.length === 0)) {
+        return json(res, 400, { error: "user_id and text or image_urls required" });
       }
-      const result = await sendMessage(accountId, userId, text);
+      const result = await sendMessage(accountId, userId, text, imageUrls);
       return json(res, 200, result);
     }
 
