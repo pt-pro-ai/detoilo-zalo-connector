@@ -1,10 +1,12 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import {
+  catalogAttachmentPaths,
   downloadPublicImage,
   handleRpc,
   healthSnapshot,
   normalizeInboundContent,
+  removeTempFiles,
   signBody,
 } from "../core.mjs";
 
@@ -52,6 +54,16 @@ test("account.attach validates required fields", async () => {
     assert.equal(err.status, 400);
     return true;
   });
+});
+
+test("catalog photos become temp files and are removed after", async () => {
+  const files = await catalogAttachmentPaths(["https://cdn.example/shirt.png"], async () => ({
+    contentType: "image/png",
+    base64: Buffer.from("png-bytes").toString("base64"),
+  }));
+  assert.equal(files.length, 1);
+  assert.match(files[0], /\.png$/);
+  removeTempFiles(files);
 });
 
 test("account.send validates required fields", async () => {
