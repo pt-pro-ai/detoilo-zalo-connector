@@ -7,6 +7,7 @@ import crypto from "node:crypto";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
+import { imageSizeFromFile } from "image-size/fromFile";
 import { LoginQRCallbackEventType, ThreadType, Zalo } from "zca-js";
 
 /** @type {Map<string, any>} */
@@ -19,6 +20,29 @@ export function signBody(secret, bodyBuf) {
 }
 
 const MAX_IMAGE_BYTES = 8 * 1024 * 1024;
+
+/**
+ * zca-js 2.x dropped its image reader. Photo and gif uploads by file path
+ * need width, height, and byte size on the Zalo client.
+ */
+export async function imageMetadataGetter(filePath) {
+  const [metadata, stat] = await Promise.all([
+    imageSizeFromFile(filePath),
+    fs.promises.stat(filePath),
+  ]);
+  if (!metadata?.width || !metadata?.height) {
+    throw new Error(`could not read image dimensions: ${path.basename(filePath)}`);
+  }
+  return {
+    width: metadata.width,
+    height: metadata.height,
+    size: stat.size,
+  };
+}
+
+export function createZalo() {
+  return new Zalo({ imageMetadataGetter });
+}
 
 function isPublicHttps(raw) {
   let url;
@@ -180,7 +204,7 @@ export async function startQrLogin(sessionId, businessId) {
   };
   qrSessions.set(sessionId, session);
 
-  const zalo = new Zalo();
+  const zalo = createZalo();
   zalo
     .loginQR({}, (event) => {
       if (event.type === LoginQRCallbackEventType.QRCodeGenerated) {
@@ -254,7 +278,7 @@ export async function attachAccount({
 }) {
   await detachAccount(accountId);
 
-  const zalo = new Zalo();
+  const zalo = createZalo();
   let api;
   try {
     api = await zalo.login({
