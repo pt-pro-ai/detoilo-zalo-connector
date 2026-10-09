@@ -1,14 +1,22 @@
 import assert from "node:assert/strict";
+import fs from "node:fs";
+import os from "node:os";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
 import { test } from "node:test";
 import {
   catalogAttachmentPaths,
+  createZalo,
   downloadPublicImage,
   handleRpc,
   healthSnapshot,
+  imageMetadataGetter,
   normalizeInboundContent,
   removeTempFiles,
   signBody,
 } from "../core.mjs";
+
+const FIXTURES = path.join(path.dirname(fileURLToPath(import.meta.url)), "fixtures");
 
 test("health RPC reports no attached accounts", async () => {
   const data = await handleRpc("health", {});
@@ -54,6 +62,33 @@ test("account.attach validates required fields", async () => {
     assert.equal(err.status, 400);
     return true;
   });
+});
+
+test("zalo client reports photo dimensions for uploads", async () => {
+  const zalo = createZalo();
+  assert.equal(zalo.options.imageMetadataGetter, imageMetadataGetter);
+
+  const expected = {
+    "photo.jpg": { width: 8, height: 4 },
+    "photo.png": { width: 4, height: 2 },
+    "photo.webp": { width: 6, height: 2 },
+    "photo.gif": { width: 8, height: 2 },
+  };
+  for (const [name, dimensions] of Object.entries(expected)) {
+    const file = path.join(FIXTURES, name);
+    const meta = await imageMetadataGetter(file);
+    assert.equal(meta.width, dimensions.width, name);
+    assert.equal(meta.height, dimensions.height, name);
+    assert.equal(meta.size, fs.statSync(file).size, name);
+  }
+
+  const broken = path.join(os.tmpdir(), `detoilo-broken-${process.pid}.jpg`);
+  fs.writeFileSync(broken, Buffer.from("not-an-image"));
+  try {
+    await assert.rejects(() => imageMetadataGetter(broken));
+  } finally {
+    fs.rmSync(broken, { force: true });
+  }
 });
 
 test("catalog photos become temp files and are removed after", async () => {
