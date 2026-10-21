@@ -44,6 +44,48 @@ export function createZalo() {
   return new Zalo({ imageMetadataGetter });
 }
 
+/** Pull avatar and a zalo.me link out of a zca-js getUserInfo payload. */
+export function profileFromUserInfo(info, userId) {
+  const id = String(userId || "");
+  const pools = [info?.changed_profiles, info?.unchanged_profiles];
+  let row = null;
+  for (const pool of pools) {
+    if (pool && typeof pool === "object" && pool[id]) {
+      row = pool[id];
+      break;
+    }
+  }
+  if (!row && info && (info.avatar || info.displayName || info.zaloName)) {
+    row = info;
+  }
+  if (!row || typeof row !== "object") return null;
+  const avatar = String(row.avatar || "").trim() || null;
+  const username = String(row.username || "").trim();
+  const safeUsername = username && !/[/?#\s]/.test(username) ? username : "";
+  const profileUrl = safeUsername
+    ? `https://zalo.me/${encodeURIComponent(safeUsername)}`
+    : /^\d+$/.test(id)
+      ? `https://zalo.me/${id}`
+      : null;
+  const name = String(row.displayName || row.zaloName || "").trim() || null;
+  if (!avatar && !profileUrl && !name) return null;
+  return { avatar, profileUrl, name };
+}
+
+async function lookupProfile(entry, userId) {
+  if (!entry.profiles) entry.profiles = new Map();
+  if (entry.profiles.has(userId)) return entry.profiles.get(userId);
+  if (typeof entry.api?.getUserInfo !== "function") return null;
+  try {
+    const profile = profileFromUserInfo(await entry.api.getUserInfo(userId), userId);
+    entry.profiles.set(userId, profile);
+    return profile;
+  } catch (err) {
+    console.error("user profile lookup failed:", err?.message || err);
+    return null;
+  }
+}
+
 function isPublicHttps(raw) {
   let url;
   try {
@@ -327,8 +369,13 @@ export async function attachAccount({
         message.data?.msgId || message.data?.messageId || `${fromUserId}-${Date.now()}`,
       );
       const isStranger = !entry.friendIds.has(fromUserId);
+      const profile = await lookupProfile(entry, fromUserId);
       const fromDisplayName =
-        message.data?.dName || message.data?.displayName || message.data?.zaloName || null;
+        message.data?.dName ||
+        message.data?.displayName ||
+        message.data?.zaloName ||
+        profile?.name ||
+        null;
 
       await postWebhook(entry.webhookUrl, entry.webhookSecret, {
         event: "message",
@@ -340,6 +387,8 @@ export async function attachAccount({
           images: normalized.images,
           from_user_id: fromUserId,
           from_display_name: fromDisplayName,
+          from_avatar_url: profile?.avatar || null,
+          from_profile_url: profile?.profileUrl || null,
           is_self: false,
           thread_type: "user",
           is_stranger: isStranger,
