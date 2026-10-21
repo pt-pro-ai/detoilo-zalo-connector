@@ -8,6 +8,7 @@ import {
   catalogAttachmentPaths,
   createZalo,
   downloadPublicImage,
+  profileFromUserInfo,
   handleRpc,
   healthSnapshot,
   imageMetadataGetter,
@@ -62,6 +63,28 @@ test("account.attach validates required fields", async () => {
     assert.equal(err.status, 400);
     return true;
   });
+});
+
+test("profileFromUserInfo reads avatar and zalo.me link", () => {
+  const profile = profileFromUserInfo(
+    {
+      changed_profiles: {
+        9988: {
+          avatar: "https://s120-ava-talk.zadn.vn/a.jpg",
+          displayName: "Lan",
+          username: "lan.ovana",
+        },
+      },
+    },
+    "9988",
+  );
+  assert.equal(profile.avatar, "https://s120-ava-talk.zadn.vn/a.jpg");
+  assert.equal(profile.name, "Lan");
+  assert.equal(profile.profileUrl, "https://zalo.me/lan.ovana");
+
+  const byId = profileFromUserInfo({ unchanged_profiles: { 42: {} } }, "42");
+  assert.equal(byId.profileUrl, "https://zalo.me/42");
+  assert.equal(profileFromUserInfo(null, "42"), null);
 });
 
 test("zalo client reports photo dimensions for uploads", async () => {
