@@ -138,6 +138,15 @@ export async function downloadPublicImage(url, fetchImpl = fetch) {
   return null;
 }
 
+/** Customer id for a 1-1 listener event. Self messages use the thread, not our uid. */
+export function participantFromListenerMessage(message) {
+  const isSelf = Boolean(message?.isSelf);
+  const threadId = String(message?.threadId || "");
+  const uidFrom = String(message?.data?.uidFrom || "");
+  const userId = isSelf ? threadId : uidFrom || threadId;
+  return { isSelf, userId };
+}
+
 /**
  * Turn a zca-js message body into the webhook payload the API stores.
  * `download` is injected so tests do not touch the network.
@@ -355,7 +364,6 @@ export async function attachAccount({
 
   api.listener.on("message", async (message) => {
     try {
-      if (message.isSelf) return;
       if (message.type !== ThreadType.User) return;
       const normalized = await normalizeInboundContent(message.data?.content, {
         msgType: message.data?.msgType,
@@ -363,7 +371,7 @@ export async function attachAccount({
       });
       if (!normalized) return;
 
-      const fromUserId = String(message.data?.uidFrom || message.threadId || "");
+      const { isSelf, userId: fromUserId } = participantFromListenerMessage(message);
       if (!fromUserId) return;
       const msgId = String(
         message.data?.msgId || message.data?.messageId || `${fromUserId}-${Date.now()}`,
@@ -389,7 +397,8 @@ export async function attachAccount({
           from_display_name: fromDisplayName,
           from_avatar_url: profile?.avatar || null,
           from_profile_url: profile?.profileUrl || null,
-          is_self: false,
+          is_self: isSelf,
+          thread_id: String(message.threadId || ""),
           thread_type: "user",
           is_stranger: isStranger,
           timestamp: message.data?.ts || message.data?.timestamp || Date.now(),

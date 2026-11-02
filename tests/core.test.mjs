@@ -13,6 +13,7 @@ import {
   healthSnapshot,
   imageMetadataGetter,
   normalizeInboundContent,
+  participantFromListenerMessage,
   removeTempFiles,
   signBody,
 } from "../core.mjs";
@@ -31,6 +32,24 @@ test("healthSnapshot matches health RPC", () => {
   const snap = healthSnapshot();
   assert.equal(snap.ok, true);
   assert.ok(Array.isArray(snap.account_ids));
+});
+
+test("self messages use the thread id as the customer", () => {
+  const self = participantFromListenerMessage({
+    isSelf: true,
+    threadId: "customer_1",
+    data: { uidFrom: "owner_1" },
+  });
+  assert.equal(self.isSelf, true);
+  assert.equal(self.userId, "customer_1");
+
+  const inbound = participantFromListenerMessage({
+    isSelf: false,
+    threadId: "customer_1",
+    data: { uidFrom: "customer_1" },
+  });
+  assert.equal(inbound.isSelf, false);
+  assert.equal(inbound.userId, "customer_1");
 });
 
 test("unknown RPC method is 404", async () => {
